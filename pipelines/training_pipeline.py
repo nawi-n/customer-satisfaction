@@ -13,21 +13,16 @@ docker_settings = DockerSettings(required_integrations=[MLFLOW])
 def train_pipeline():
     """Training pipeline for the customer satisfaction model"""
     
-    # Initialize MLflow
-    mlflow.set_tracking_uri(mlflow.get_tracking_uri())
-    mlflow.set_experiment("customer_satisfaction_experiment")
+    # Get the data
+    df = ingest_data()
     
-    with mlflow.start_run() as run:
-        # Get the data
-        df = ingest_data()
-        
-        # Clean the data
-        x_train, x_test, y_train, y_test = clean_data(df)
-        
-        # Train the model
-        model = train_model(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test)
-        
-        # Evaluate the model
-        mse, rmse = evaluation(model=model, x_test=x_test, y_test=y_test)
-        
-        return mse, rmse
+    # Clean the data
+    x_train, x_test, y_train, y_test = clean_data(df)
+    
+    # Train the model
+    model = train_model(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test)
+    
+    # Evaluate the model
+    mse, rmse = evaluation(model=model, x_test=x_test, y_test=y_test)
+    
+    return mse, rmse

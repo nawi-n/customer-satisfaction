@@ -11,10 +11,14 @@ from model.model_dev import (
 from sklearn.base import RegressorMixin
 from zenml import step
 from zenml.client import Client
+from zenml.integrations.mlflow.mlflow_utils import get_tracking_uri
 
 experiment_tracker = Client().active_stack.experiment_tracker
 
-@step(experiment_tracker=experiment_tracker.name)
+# Set MLflow tracking URI
+mlflow.set_tracking_uri(get_tracking_uri())
+
+@step(experiment_tracker=experiment_tracker.name, enable_cache=False)
 def train_model(
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
@@ -66,6 +70,9 @@ def train_model(
 
             mlflow.log_param("model_type", model_name)
             mlflow.log_param("fine_tuning", fine_tuning)
+            
+            # Log the model to MLflow
+            mlflow.sklearn.log_model(trained_model, "model")
             
             return trained_model
     except Exception as e:

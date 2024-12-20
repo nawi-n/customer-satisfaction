@@ -1,21 +1,13 @@
 import logging
 from typing import Tuple
 import pandas as pd
+import numpy as np
 from model.data_cleaning import (
     DataCleaning,
     DataDivideStrategy,
     DataPreprocessStrategy,
 )
 from zenml import step
-from zenml.steps import StepContext
-from typing_extensions import Annotated
-from pydantic import BaseModel, Field
-
-class DataFrameInput(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
-
-    df: Annotated[pd.DataFrame, Field(...)]
 
 @step
 def clean_data(
@@ -23,10 +15,10 @@ def clean_data(
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     """Clean and preprocess the input data."""
     try:
-        # Convert StepArtifact to DataFrame if needed
-        if isinstance(df, StepContext):
-            df = df.read(pd.DataFrame)
-        
+        # Ensure we have a DataFrame
+        if not isinstance(df, pd.DataFrame):
+            raise ValueError(f"Expected DataFrame but got {type(df)}")
+            
         if df.empty:
             raise ValueError("Input DataFrame is empty")
         

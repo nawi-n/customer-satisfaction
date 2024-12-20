@@ -7,8 +7,12 @@ from sklearn.base import RegressorMixin
 from typing import Tuple
 from zenml import step
 from zenml.client import Client
+from zenml.integrations.mlflow.mlflow_utils import get_tracking_uri
 
 experiment_tracker = Client().active_stack.experiment_tracker
+
+# Set MLflow tracking URI
+mlflow.set_tracking_uri(get_tracking_uri())
 
 @step(experiment_tracker=experiment_tracker.name)
 def evaluation(

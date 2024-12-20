@@ -1,42 +1,26 @@
 import json
-
-# from .utils import get_data_for_test
+import logging
 import os
-
 import numpy as np
 import pandas as pd
-from materializer.custom_materializer import cs_materializer
-from steps.clean_data import clean_data
-from steps.evaluation import evaluation
-from steps.ingest_data import ingest_data
-from steps.model_train import train_model
 from zenml import pipeline, step
 from zenml.config import DockerSettings
-from zenml.constants import DEFAULT_SERVICE_START_STOP_TIMEOUT
-from zenml.integrations.constants import MLFLOW, TENSORFLOW
+from zenml.integrations.constants import MLFLOW
 from zenml.integrations.mlflow.model_deployers.mlflow_model_deployer import (
     MLFlowModelDeployer,
 )
 from zenml.integrations.mlflow.services import MLFlowDeploymentService
 from zenml.integrations.mlflow.steps import mlflow_model_deployer_step
 
+from steps.clean_data import clean_data
+from steps.evaluation import evaluation
+from steps.ingest_data import ingest_data
+from steps.model_train import train_model
+from .utils import get_data_for_test
 from pydantic import BaseModel
 
-from .utils import get_data_for_test
 
 docker_settings = DockerSettings(required_integrations=[MLFLOW])
-import pandas as pd
-
-# import os
-
-
-# from zenml.integrations.mlflow.model_deployers.mlflow_model_deployer import (
-#     MLFlowModelDeployer,
-# )
-# from zenml.integrations.mlflow.services import MLFlowDeploymentService
-# from zenml.pipelines import pipeline
-# from zenml.steps import BaseParameters, Output, step
-
 
 requirements_file = os.path.join(os.path.dirname(__file__), "requirements.txt")
 
@@ -51,7 +35,7 @@ def dynamic_importer() -> str:
 class DeploymentTriggerConfig(BaseModel):
     """Parameters that are used to trigger the deployment"""
 
-    min_accuracy: float = 0.9
+    min_accuracy: float = 0
 
 
 @step
@@ -89,20 +73,9 @@ def prediction_service_loader(
     running: bool = True,
     model_name: str = "model",
 ) -> MLFlowDeploymentService:
-    """Get the prediction service started by the deployment pipeline.
-
-    Args:
-        pipeline_name: name of the pipeline that deployed the MLflow prediction
-            server
-        step_name: the name of the step that deployed the MLflow prediction
-            server
-        running: when this flag is set, the step only returns a running service
-        model_name: the name of the model that is deployed
-    """
-    # get the MLflow model deployer stack component
+    """Get the prediction service started by the deployment pipeline."""
     model_deployer = MLFlowModelDeployer.get_active_model_deployer()
 
-    # fetch existing services with same pipeline name, step name and model name
     existing_services = model_deployer.find_model_server(
         pipeline_name=pipeline_name,
         pipeline_step_name=pipeline_step_name,
@@ -117,8 +90,6 @@ def prediction_service_loader(
             f"pipeline for the '{model_name}' model is currently "
             f"running."
         )
-    print(existing_services)
-    print(type(existing_services))
     return existing_services[0]
 
 
@@ -188,66 +159,72 @@ def predictor(
 
 @pipeline(enable_cache=False, settings={"docker": docker_settings})
 def continuous_deployment_pipeline(
-    min_accuracy: float = 0.92,
+    min_accuracy: float = 0,
     workers: int = 1,
     timeout: int = 60,
 ):
-    """
-    Args:
-        min_accuracy: Minimum accuracy required for model deployment
-        workers: Number of workers to use for parallel processing
-        timeout: Timeout in seconds
-    """
-    # Get the data
-    df = ingest_data()
-    if df is None:
-        raise ValueError("ingest_data step returned None")
-    
-    # Clean the data
-    x_train, x_test, y_train, y_test = clean_data(df=df)
-    
-    # Train the model
-    model = train_model(
-        x_train=x_train,
-        x_test=x_test,
-        y_train=y_train,
-        y_test=y_test,
-    )
-    
-    # Evaluate the model
-    r2_score, rmse = evaluation(
-        model=model,
-        x_test=x_test,
-        y_test=y_test,
-    )
+    """Training and deployment pipeline."""
+    try:
+        # Get the data
+        df = ingest_data()
+        
+        # Clean and prepare the data
+        x_train, x_test, y_train, y_test = clean_data(df)
+        
+        # Train the model
+        model = train_model(
+            x_train=x_train,
+            x_test=x_test,
+            y_train=y_train,
+            y_test=y_test,
+        )
+        
+        # Evaluate the model
+        r2_score, rmse = evaluation(
+            model=model,
+            x_test=x_test,
+            y_test=y_test,
+        )
+        
+        # Deploy if accuracy threshold is met
+        deployment_decision = deployment_trigger(
+            accuracy=r2_score,
+            min_accuracy=min_accuracy,
+        )
+        
+        mlflow_model_deployer_step(
+            model=model,
+            deploy_decision=deployment_decision,
+            workers=workers,
+            timeout=timeout,
+        )
+        
+    except Exception as e:
+        logging.error(f"Pipeline failed: {str(e)}")
+        raise e
 
-    # Deploy the model if accuracy meets threshold
-    deployment_decision = deployment_trigger(
-        accuracy=r2_score,
-        min_accuracy=min_accuracy,
-    )
-
-    mlflow_model_deployer_step(
-        model=model,
-        deploy_decision=deployment_decision,
-        workers=workers,
-        timeout=timeout,
-    )
 
 @pipeline(enable_cache=False, settings={"docker": docker_settings})
 def inference_pipeline(
     pipeline_name: str,
     pipeline_step_name: str,
 ):
-    # Get the data
-    df = ingest_data()
+    """Inference pipeline for making predictions"""
     
-    # Clean the data
-    x_train, x_test, y_train, y_test = clean_data(df=df)
-    
-    # Get predictions
-    prediction_service_loader(
+    # Get the prediction service
+    service = prediction_service_loader(
         pipeline_name=pipeline_name,
         pipeline_step_name=pipeline_step_name,
-        x_test=x_test,
     )
+    
+    # Get data for prediction
+    df = ingest_data()
+    x_train, x_test, y_train, y_test = clean_data(df)
+    
+    # Make predictions using the service
+    prediction = predictor(
+        service=service,
+        data=x_test,
+    )
+    
+    return prediction

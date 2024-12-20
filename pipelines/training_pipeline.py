@@ -9,7 +9,7 @@ from steps.evaluation import evaluation
 
 docker_settings = DockerSettings(required_integrations=[MLFLOW])
 
-@pipeline(enable_cache=False, settings={"docker": docker_settings})
+@pipeline(enable_cache=True, settings={"docker": docker_settings})
 def train_pipeline():
     """Training pipeline for the customer satisfaction model"""
     

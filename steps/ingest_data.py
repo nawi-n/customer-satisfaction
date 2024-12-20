@@ -16,7 +16,6 @@ def ingest_data() -> pd.DataFrame:
             raise ValueError("The loaded DataFrame is empty")
             
         logging.info(f"Successfully ingested data with shape: {df.shape}")
-        logging.info(f"DataFrame head: {df.head()}")
         return df
         
     except Exception as e:

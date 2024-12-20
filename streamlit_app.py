@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 from pipelines.deployment_pipeline import prediction_service_loader
-from run_deployment import main as run_main
+from run_deployment import main
 
 
 def main():
@@ -63,9 +63,9 @@ def main():
 
     if st.button("Predict"):
         service = prediction_service_loader(
-            pipeline_name="continuous_deployment_pipeline",
-            pipeline_step_name="mlflow_model_deployer_step",
-            running=False,
+        pipeline_name="continuous_deployment_pipeline",
+        pipeline_step_name="mlflow_model_deployer_step",
+        running=False,
         )
         if service is None:
             st.write(

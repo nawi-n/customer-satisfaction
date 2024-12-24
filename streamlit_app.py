@@ -1,11 +1,10 @@
 import json
+import pickle
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 from PIL import Image
-from pipelines.deployment_pipeline import prediction_service_loader
-from run_deployment import main
 
 
 def main():
@@ -48,30 +47,23 @@ def main():
     | Product width (CMs) |    Width of the product measured in centimeters. |
     """
     )
-    payment_sequential = st.sidebar.slider("Payment Sequential")
-    payment_installments = st.sidebar.slider("Payment Installments")
-    payment_value = st.number_input("Payment Value")
-    price = st.number_input("Price")
-    freight_value = st.number_input("freight_value")
-    product_name_length = st.number_input("Product name length")
-    product_description_length = st.number_input("Product Description length")
-    product_photos_qty = st.number_input("Product photos Quantity ")
-    product_weight_g = st.number_input("Product weight measured in grams")
-    product_length_cm = st.number_input("Product length (CMs)")
-    product_height_cm = st.number_input("Product height (CMs)")
-    product_width_cm = st.number_input("Product width (CMs)")
+    payment_sequential = st.sidebar.slider("Payment Sequential", min_value=0, max_value=10, value=0)
+    payment_installments = st.sidebar.slider("Payment Installments", min_value=0, max_value=10, value=0)
+    payment_value = st.number_input("Payment Value", min_value=0.0, value=0.0)
+    price = st.number_input("Price", min_value=0.0, value=0.0)
+    freight_value = st.number_input("Freight Value", min_value=0.0, value=0.0)
+    product_name_length = st.number_input("Product Name Length", min_value=0, value=0)
+    product_description_length = st.number_input("Product Description Length", min_value=0, value=0)
+    product_photos_qty = st.number_input("Product Photos Quantity", min_value=0, value=0)
+    product_weight_g = st.number_input("Product Weight (grams)", min_value=0, value=0)
+    product_length_cm = st.number_input("Product Length (cm)", min_value=0, value=0)
+    product_height_cm = st.number_input("Product Height (cm)", min_value=0, value=0)
+    product_width_cm = st.number_input("Product Width (cm)", min_value=0, value=0)
 
     if st.button("Predict"):
-        service = prediction_service_loader(
-        pipeline_name="continuous_deployment_pipeline",
-        pipeline_step_name="mlflow_model_deployer_step",
-        running=False,
-        )
-        if service is None:
-            st.write(
-                "No service could be found. The pipeline will be run first to create a service."
-            )
-            run_main()
+        model_path = "D:/GitHub/customer-satisfaction/saved_model/model.pkl"
+        with open(model_path, 'rb') as file:
+            model = pickle.load(file)
 
         df = pd.DataFrame(
             {
@@ -89,14 +81,16 @@ def main():
                 "product_width_cm": [product_width_cm],
             }
         )
-        json_list = json.loads(json.dumps(list(df.T.to_dict().values())))
-        data = np.array(json_list)
-        pred = service.predict(data)
-        st.success(
-            "Your Customer Satisfactory rate(range between 0 - 5) with given product details is :-{}".format(
-                pred
+        data = df.values
+        try:
+            pred = model.predict(data)
+            st.success(
+                "Your Customer Satisfactory rate(range between 0 - 5) with given product details is :-{}".format(
+                    pred[0]
+                )
             )
-        )
+        except Exception as e:
+            st.error(f"An error occurred during prediction: {e}")
     if st.button("Results"):
         st.write(
             "We have experimented with two ensemble and tree based models and compared the performance of each model. The results are as follows:"

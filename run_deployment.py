@@ -12,6 +12,8 @@ from pipelines.deployment_pipeline import (
     inference_pipeline,
 )
 
+from typing import cast
+
 DEPLOY = "deploy"
 PREDICT = "predict"
 DEPLOY_AND_PREDICT = "deploy_and_predict"
